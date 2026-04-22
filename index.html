@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Appointment">
+<meta name="theme-color" content="#8b1a1a">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Appointment Book</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #faf7f2;
+  --paper: #f4ede3;
+  --paper2: #ede3d6;
+  --line: #c9a89a;
+  --line-light: #e8d8d0;
+  --red: #8b1a1a;
+  --red2: #6e1515;
+  --ink: #1c1008;
+  --ink2: #5a3a28;
+  --slot: 34px;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; }
+
+body {
+  font-family:'DM Mono',monospace;
+  background:var(--cream);
+  display:flex; flex-direction:column;
+  max-width:480px; margin:0 auto;
+  box-shadow:0 0 40px rgba(0,0,0,0.2);
+  height:100dvh;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  background:var(--red);
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  flex-shrink:0;
+  user-select:none;
+}
+.topbar-inner {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px 10px;
+}
+.app-name {
+  font-family:'Libre Baskerville',serif;
+  font-style:italic; color:#fff;
+  font-size:1.05rem; letter-spacing:0.03em;
+}
+.top-date {
+  color:rgba(255,255,255,0.8);
+  font-size:0.6rem; letter-spacing:0.1em;
+  text-align:center; flex:1; padding:0 8px;
+}
+.top-btn {
+  background:rgba(255,255,255,0.18);
+  border:none; color:#fff;
+  width:32px; height:32px; border-radius:8px;
+  font-size:1.1rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* ── DAY TABS ── */
+.day-tabs {
+  display:flex; background:var(--red2);
+  border-bottom:2px solid rgba(0,0,0,0.15);
+  flex-shrink:0; overflow-x:auto;
+  scrollbar-width:none;
+}
+.day-tabs::-webkit-scrollbar { display:none; }
+.day-tab {
+  flex:1; min-width:44px;
+  display:flex; flex-direction:column; align-items:center;
+  padding:7px 4px 6px;
+  border:none; background:none; cursor:pointer;
+  border-bottom:3px solid transparent;
+  transition:all 0.15s;
+}
+.day-tab.active { background:rgba(255,255,255,0.15); border-bottom-color:#fff; }
+.day-tab.today .tab-num { color:#ffe0b2; }
+.tab-day { font-size:0.5rem; color:rgba(255,255,255,0.65); letter-spacing:0.1em; }
+.tab-num { font-family:'Libre Baskerville',serif; font-size:1rem; color:#fff; line-height:1.1; }
+
+/* ── SCHEDULE BODY ── */
+.schedule-wrap {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  background:var(--cream);
+  position:relative;
+}
+
+.schedule-grid {
+  display:grid;
+  grid-template-columns: 44px 1fr;
+  position:relative;
+}
+
+/* Time label */
+.t-label {
+  height:var(--slot);
+  display:flex; align-items:flex-start; justify-content:flex-end;
+  padding:4px 6px 0 0;
+  border-right:2px solid var(--line);
+  border-bottom:1px solid var(--line-light);
+  background:var(--paper);
+  position:sticky; left:0; z-index:2;
+}
+.t-label.hour { background:var(--paper2); border-bottom-color:var(--line); }
+.t-label.half { background:var(--paper); }
+.hour-n { font-family:'Libre Baskerville',serif; font-size:1rem; color:var(--red); font-weight:700; line-height:1; }
+.hour-ap { font-size:0.42rem; color:var(--line); margin-top:3px; margin-left:1px; }
+.half-m { font-size:0.5rem; color:var(--line); margin-top:5px; }
+
+/* Slot cell */
+.slot-cell {
+  height:var(--slot);
+  border-bottom:1px solid var(--line-light);
+  position:relative; cursor:pointer;
+  transition:background 0.1s;
+}
+.slot-cell.hour { border-bottom-color:var(--line); background:rgba(244,237,227,0.4); }
+.slot-cell:active { background:rgba(139,26,26,0.06); }
+
+/* Now line */
+.now-line {
+  position:absolute; left:44px; right:0;
+  height:2px; background:var(--red);
+  z-index:10; pointer-events:none;
+  box-shadow:0 0 6px rgba(139,26,26,0.4);
+}
+.now-line::before {
+  content:''; position:absolute;
+  left:-5px; top:-4px;
+  width:10px; height:10px;
+  background:var(--red); border-radius:50%;
+}
+
+/* Appointment block */
+.appt {
+  position:absolute;
+  left:4px; right:4px; top:2px;
+  border-radius:4px;
+  padding:4px 8px;
+  color:#fff; overflow:hidden;
+  cursor:pointer; z-index:5;
+  box-shadow:0 2px 6px rgba(0,0,0,0.2);
+  transition:filter 0.1s;
+}
+.appt:active { filter:brightness(0.9); }
+.appt-name { font-family:'Libre Baskerville',serif; font-size:0.72rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.appt-sub { font-size:0.55rem; opacity:0.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+.appt-time { font-size:0.48rem; opacity:0.7; margin-top:2px; }
+
+/* ── BOTTOM SHEET MODAL ── */
+.overlay {
+  position:fixed; inset:0;
+  background:rgba(20,8,2,0.55);
+  backdrop-filter:blur(3px);
+  z-index:100;
+  display:flex; align-items:flex-end;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.25s;
+}
+.overlay.open { opacity:1; pointer-events:all; }
+
+.sheet {
+  width:100%; background:var(--cream);
+  border-radius:20px 20px 0 0;
+  padding-bottom:env(safe-area-inset-bottom, 20px);
+  box-shadow:0 -10px 50px rgba(0,0,0,0.3);
+  transform:translateY(100%);
+  transition:transform 0.3s cubic-bezier(0.32,0.72,0,1);
+  max-height:92dvh; overflow-y:auto;
+}
+.overlay.open .sheet { transform:translateY(0); }
+
+.sheet-handle { width:36px; height:4px; background:var(--line); border-radius:2px; margin:12px auto 0; }
+
+.sheet-body { padding:16px 20px 24px; }
+
+.sheet-title { font-family:'Libre Baskerville',serif; font-style:italic; color:var(--red); font-size:1.1rem; }
+.sheet-datetime { font-size:0.6rem; color:var(--ink2); margin-top:3px; letter-spacing:0.04em; }
+
+.field { margin-top:16px; }
+.field label { display:block; font-size:0.55rem; color:var(--red); letter-spacing:0.12em; text-transform:uppercase; margin-bottom:5px; }
+.field input, .field textarea {
+  width:100%; padding:11px 13px;
+  background:var(--paper); border:1.5px solid var(--line);
+  border-radius:10px; font-family:'DM Mono',monospace;
+  font-size:0.85rem; color:var(--ink); outline:none;
+  -webkit-appearance:none;
+}
+.field input:focus, .field textarea:focus { border-color:var(--red); }
+.field textarea { min-height:60px; resize:none; }
+
+/* Duration pills */
+.dur-row { display:flex; flex-wrap:wrap; gap:7px; margin-top:6px; }
+.dur-pill {
+  padding:7px 13px; background:var(--paper);
+  border:1.5px solid var(--line); border-radius:20px;
+  font-size:0.65rem; color:var(--ink2); cursor:pointer;
+  font-family:'DM Mono',monospace; transition:all 0.15s;
+}
+.dur-pill.on { background:var(--red); border-color:var(--red); color:#fff; }
+
+/* Color dots */
+.color-row { display:flex; gap:10px; margin-top:6px; }
+.cdot {
+  width:28px; height:28px; border-radius:50%;
+  border:3px solid transparent; cursor:pointer;
+  transition:transform 0.15s, border-color 0.15s;
+}
+.cdot.on { border-color:var(--ink); transform:scale(1.2); }
+
+/* Action buttons */
+.sheet-actions { display:flex; gap:10px; margin-top:22px; }
+.btn-save {
+  flex:1; padding:15px; background:var(--red); color:#fff;
+  border:none; border-radius:12px;
+  font-family:'Libre Baskerville',serif; font-size:0.9rem;
+  cursor:pointer; letter-spacing:0.04em;
+}
+.btn-del {
+  padding:15px 18px; background:var(--paper);
+  border:1.5px solid var(--line); border-radius:12px;
+  color:var(--red); font-family:'Libre Baskerville',serif;
+  font-size:0.9rem; cursor:pointer;
+}
+.btn-close {
+  position:absolute; top:16px; right:20px;
+  background:var(--paper2); border:none;
+  width:28px; height:28px; border-radius:50%;
+  color:var(--ink2); font-size:0.75rem; cursor:pointer;
+}
+
+/* ── SYNC STATUS ── */
+.sync-bar {
+  position:fixed; top:0; left:50%; transform:translateX(-50%);
+  background:var(--ink); color:#fff;
+  font-size:0.6rem; padding:5px 14px; border-radius:0 0 10px 10px;
+  z-index:200; transition:opacity 0.4s;
+  pointer-events:none; white-space:nowrap;
+}
+
+/* ── EMPTY STATE ── */
+.empty-day {
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:center; padding:60px 20px;
+  color:var(--line); font-size:0.7rem; letter-spacing:0.06em;
+  gap:10px;
+}
+.empty-day .e-icon { font-size:2rem; opacity:0.4; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="app-name">Appointment Book</div>
+    <div class="top-date" id="topDate"></div>
+    <button class="top-btn" onclick="goToday()" title="오늘">◎</button>
+  </div>
+  <!-- DAY TABS -->
+  <div class="day-tabs" id="dayTabs"></div>
+</div>
+
+<!-- SCHEDULE -->
+<div class="schedule-wrap" id="schedWrap">
+  <div class="schedule-grid" id="schedGrid"></div>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" onclick="maybeClose(event)">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-body" style="position:relative">
+      <button class="btn-close" onclick="closeModal()">✕</button>
+      <div class="sheet-title" id="sheetTitle">새 예약</div>
+      <div class="sheet-datetime" id="sheetDt"></div>
+
+      <div class="field">
+        <label>이름 / 고객명</label>
+        <input id="fName" type="text" placeholder="홍길동" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>메모 / 서비스</label>
+        <input id="fNote" type="text" placeholder="커트, 상담, 미팅…" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>소요시간</label>
+        <div class="dur-row" id="durRow"></div>
+      </div>
+      <div class="field">
+        <label>색상</label>
+        <div class="color-row" id="colorRow"></div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn-del" id="btnDel" style="display:none" onclick="deleteAppt()">삭제</button>
+        <button class="btn-save" onclick="saveAppt()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SYNC BAR -->
+<div class="sync-bar" id="syncBar" style="opacity:0"></div>
+
+<script>
+// ── CONFIG ── (구글 시트 연동 시 여기 수정)
+const SHEET_ID  = '';   // 구글 스프레드시트 ID
+const SHEET_API = '';   // Google Apps Script Web App URL
+
+// ── CONSTANTS ──
+const START_H = 6, END_H = 22, SLOT_MIN = 15;
+const TOTAL   = ((END_H - START_H) * 60) / SLOT_MIN;
+const SLOT_H  = 34;
+const DAYS_KO = ['일','월','화','수','목','금','토'];
+const MONTHS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const COLORS  = [
+  {id:1,bg:'#b5322a',border:'#8b1a1a'},
+  {id:2,bg:'#1a5c8a',border:'#134569'},
+  {id:3,bg:'#1f7a52',border:'#155a3c'},
+  {id:4,bg:'#7a5c1a',border:'#5a4210'},
+  {id:5,bg:'#6b2d83',border:'#4e2060'},
+];
+const DURS = [{v:1,l:'15분'},{v:2,l:'30분'},{v:3,l:'45분'},{v:4,l:'1시간'},{v:6,l:'1.5시간'},{v:8,l:'2시간'}];
+
+// ── STATE ──
+let weekOffset = 0;
+let appts = JSON.parse(localStorage.getItem('appts_v2') || '{}');
+let modal = null; // {mode,key,slot,name,note,duration,color,idx}
+let selDur = 2, selColor = 1;
+let focusDay = new Date().getDay();
+
+function persist() {
+  localStorage.setItem('appts_v2', JSON.stringify(appts));
+  syncToSheet();
+}
+
+// ── DATE HELPERS ──
+function weekDays(offset) {
+  const d = new Date(); d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - d.getDay() + offset * 7);
+  return Array.from({length:7}, (_,i) => { const x=new Date(d); x.setDate(x.getDate()+i); return x; });
+}
+function dk(d) { return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`; }
+function p2(n) { return String(n).padStart(2,'0'); }
+function isToday(d) {
+  const t=new Date(); t.setHours(0,0,0,0); const x=new Date(d); x.setHours(0,0,0,0);
+  return t.getTime()===x.getTime();
+}
+function slotToTime(s) {
+  const tm = START_H*60 + s*SLOT_MIN;
+  let h=Math.floor(tm/60), m=tm%60;
+  const ap=h<12?'AM':'PM'; if(h>12)h-=12; if(h===0)h=12;
+  return `${h}:${p2(m)} ${ap}`;
+}
+function nowSlotPx() {
+  const n=new Date();
+  return ((n.getHours()-START_H)*60+n.getMinutes())/SLOT_MIN * SLOT_H;
+}
+
+// ── BUILD UI ──
+function buildTabs() {
+  const days = weekDays(weekOffset);
+  const hd = document.getElementById('topDate');
+  hd.textContent = `${MONTHS[days[0].getMonth()]} ${days[0].getDate()} – ${MONTHS[days[6].getMonth()]} ${days[6].getDate()}, ${days[6].getFullYear()}`;
+
+  const tabs = document.getElementById('dayTabs');
+  tabs.innerHTML = days.map((d,i) => `
+    <button class="day-tab ${i===focusDay?'active':''} ${isToday(d)?'today':''}" onclick="setDay(${i})">
+      <span class="tab-day">${DAYS_KO[i]}</span>
+      <span class="tab-num">${d.getDate()}</span>
+    </button>`).join('');
+}
+
+function buildGrid() {
+  const days = weekDays(weekOffset);
+  const d = days[focusDay];
+  const key = dk(d);
+  const dayAppts = appts[key] || [];
+
+  const grid = document.getElementById('schedGrid');
+  grid.innerHTML = '';
+
+  // Now line
+  const npx = nowSlotPx();
+  if (isToday(d) && npx > 0 && npx < TOTAL * SLOT_H) {
+    const nl = document.createElement('div');
+    nl.className = 'now-line';
+    nl.style.cssText = `top:${npx}px; grid-column:1/3;`;
+    grid.appendChild(nl);
+  }
+
+  for (let s = 0; s < TOTAL; s++) {
+    const tm = START_H*60 + s*SLOT_MIN;
+    const h = Math.floor(tm/60), m = tm%60;
+    const isHour = m===0, isHalf = m===30;
+
+    // Time label
+    const tl = document.createElement('div');
+    tl.className = 't-label' + (isHour?' hour':isHalf?' half':'');
+    if (isHour) {
+      const h12 = h>12?h-12:h===0?12:h;
+      const ap = h<12?'a':'p';
+      tl.innerHTML = `<span class="hour-n">${h12}</span><span class="hour-ap">${ap}</span>`;
+    } else if (isHalf) {
+      tl.innerHTML = `<span class="half-m">30</span>`;
+    }
+    grid.appendChild(tl);
+
+    // Slot cell
+    const cell = document.createElement('div');
+    cell.className = 'slot-cell' + (isHour?' hour':'');
+    cell.onclick = () => openNew(key, s);
+
+    // Render appts starting at this slot
+    dayAppts.forEach((a,ai) => {
+      if (a.slot !== s) return;
+      const col = COLORS.find(c=>c.id===a.color)||COLORS[0];
+      const el = document.createElement('div');
+      el.className = 'appt';
+      el.style.cssText = `background:${col.bg};height:${a.duration*SLOT_H-4}px;border-left:3px solid ${col.border}`;
+      el.innerHTML = `<div class="appt-name">${esc(a.name)}</div>${a.note?`<div class="appt-sub">${esc(a.note)}</div>`:''}<div class="appt-time">${slotToTime(a.slot)}</div>`;
+      el.onclick = e => { e.stopPropagation(); openEdit(key, ai); };
+      cell.appendChild(el);
+    });
+
+    grid.appendChild(cell);
+  }
+
+  // Scroll to now or 8am
+  const wrap = document.getElementById('schedWrap');
+  if (isToday(d)) {
+    wrap.scrollTop = Math.max(0, npx - 100);
+  } else {
+    wrap.scrollTop = ((8-START_H)*4) * SLOT_H;
+  }
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function render() { buildTabs(); buildGrid(); }
+
+// ── NAV ──
+function setDay(i) { focusDay=i; render(); }
+function goToday() {
+  const today = new Date().getDay();
+  const todayWeek = (() => {
+    const d=new Date(); d.setHours(0,0,0,0);
+    const sun=new Date(d); sun.setDate(d.getDate()-d.getDay());
+    const appSun=weekDays(weekOffset)[0];
+    return sun.getTime()===appSun.getTime();
+  })();
+  if (!todayWeek) weekOffset=0;
+  focusDay=today;
+  render();
+  setTimeout(()=>{ document.getElementById('schedWrap').scrollTop=Math.max(0,nowSlotPx()-100); },50);
+}
+
+// ── MODAL ──
+function buildModalStatics() {
+  // Duration pills
+  const dr = document.getElementById('durRow');
+  dr.innerHTML = DURS.map(d=>`<button class="dur-pill ${selDur===d.v?'on':''}" onclick="pickDur(${d.v},this)">${d.l}</button>`).join('');
+  // Color dots
+  const cr = document.getElementById('colorRow');
+  cr.innerHTML = COLORS.map(c=>`<button class="cdot ${selColor===c.id?'on':''}" style="background:${c.bg}" onclick="pickColor(${c.id},this)"></button>`).join('');
+}
+
+function openNew(key, slot) {
+  modal = {mode:'new', key, slot};
+  selDur=2; selColor=1;
+  document.getElementById('sheetTitle').textContent='새 예약';
+  document.getElementById('sheetDt').textContent = (() => {
+    const days=weekDays(weekOffset); const d=days[focusDay];
+    return `${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS_KO[d.getDay()]}) · ${slotToTime(slot)}`;
+  })();
+  document.getElementById('fName').value='';
+  document.getElementById('fNote').value='';
+  document.getElementById('btnDel').style.display='none';
+  buildModalStatics();
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('fName').focus(),300);
+}
+
+function openEdit(key, idx) {
+  const a = (appts[key]||[])[idx];
+  if (!a) return;
+  modal = {mode:'edit', key, idx, slot:a.slot};
+  selDur=a.duration||2; selColor=a.color||1;
+  document.getElementById('sheetTitle').textContent='예약 수정';
+  document.getElementById('sheetDt').textContent = (() => {
+    const days=weekDays(weekOffset); const d=days[focusDay];
+    return `${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS_KO[d.getDay()]}) · ${slotToTime(a.slot)}`;
+  })();
+  document.getElementById('fName').value=a.name||'';
+  document.getElementById('fNote').value=a.note||'';
+  document.getElementById('btnDel').style.display='';
+  buildModalStatics();
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeModal() { document.getElementById('overlay').classList.remove('open'); modal=null; }
+function maybeClose(e) { if(e.target===document.getElementById('overlay')) closeModal(); }
+
+function pickDur(v,el) {
+  selDur=v;
+  document.querySelectorAll('.dur-pill').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+}
+function pickColor(c,el) {
+  selColor=c;
+  document.querySelectorAll('.cdot').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+}
+
+function saveAppt() {
+  const name = document.getElementById('fName').value.trim();
+  if (!name) { document.getElementById('fName').focus(); return; }
+  const note = document.getElementById('fNote').value.trim();
+  if (!appts[modal.key]) appts[modal.key]=[];
+  if (modal.mode==='new') {
+    appts[modal.key].push({slot:modal.slot, name, note, duration:selDur, color:selColor});
+  } else {
+    appts[modal.key][modal.idx] = {slot:modal.slot, name, note, duration:selDur, color:selColor};
+  }
+  persist();
+  closeModal();
+  buildGrid();
+}
+
+function deleteAppt() {
+  if (!modal || modal.mode!=='edit') return;
+  appts[modal.key].splice(modal.idx,1);
+  persist();
+  closeModal();
+  buildGrid();
+}
+
+// ── GOOGLE SHEET SYNC ──
+function syncToSheet() {
+  if (!SHEET_API) return;
+  showSync('구글 시트 저장 중…');
+  fetch(SHEET_API, {
+    method:'POST',
+    body: JSON.stringify({action:'save', data: appts}),
+  }).then(()=>showSync('✓ 저장 완료')).catch(()=>showSync('⚠ 저장 실패'));
+}
+
+function showSync(msg) {
+  const bar = document.getElementById('syncBar');
+  bar.textContent = msg;
+  bar.style.opacity='1';
+  clearTimeout(bar._t);
+  bar._t = setTimeout(()=>{ bar.style.opacity='0'; }, 2000);
+}
+
+// ── WEEK NAV (swipe) ──
+let tx=0;
+document.getElementById('schedWrap').addEventListener('touchstart', e=>{ tx=e.touches[0].clientX; }, {passive:true});
+document.getElementById('schedWrap').addEventListener('touchend', e=>{
+  const dx = e.changedTouches[0].clientX - tx;
+  if (Math.abs(dx)>80 && e.changedTouches[0].clientY) {
+    // only horizontal swipe matters — but we keep vertical scroll
+  }
+}, {passive:true});
+
+// Day swipe on tabs area
+let tabTx=0;
+document.getElementById('dayTabs').addEventListener('touchstart',e=>{ tabTx=e.touches[0].clientX; },{passive:true});
+document.getElementById('dayTabs').addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tabTx;
+  if(Math.abs(dx)>60){
+    if(dx<0){ if(focusDay<6) focusDay++; else{weekOffset++;focusDay=0;} }
+    else { if(focusDay>0) focusDay--; else{weekOffset--;focusDay=6;} }
+    render();
+  }
+},{passive:true});
+
+// ── AUTO REFRESH NOW LINE ──
+setInterval(()=>{ buildGrid(); }, 60000);
+
+// ── INIT ──
+render();
+</script>
+</body>
+</html>
